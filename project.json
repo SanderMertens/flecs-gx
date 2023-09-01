@@ -1,0 +1,37 @@
+{
+    "id": "flecs.gx",
+    "type": "package",
+    "value": {
+        "author": "Sander Mertens",
+        "description": "Flecs renderer",
+        "use": [
+            "flecs",
+            "flecs.components.gui",
+            "flecs.components.input",
+            "flecs.components.graphics",
+            "flecs.components.transform",
+            "flecs.components.geometry",
+            "flecs.systems.transform",
+            "flecs.game"
+        ]
+    },
+    "lang.c": {
+        "${os linux}": {
+            "lib": ["m", "GL", "X11", "Xi", "Xcursor", "dl"]
+        },
+        "${os darwin}": {
+            "ldflags": [
+                "-framework Cocoa", 
+                "-framework QuartzCore", 
+                "-framework OpenGL"
+            ]
+        },
+        "${target em}": {
+            "ldflags": ["-s USE_WEBGL2=1"],
+            "${cfg debug}": {
+                "ldflags": ["-s GL_DEBUG=1"]
+            },
+            "embed": ["etc/sokol/shaders"]
+        }
+    } 
+}
