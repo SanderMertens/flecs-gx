@@ -3995,7 +3995,7 @@ _SOKOL_PRIVATE void _sapp_macos_frame(void) {
 }
 #endif
 
-_SOKOL_PRIVATE void _sapp_macos_poll_input_events() {
+_SOKOL_PRIVATE void _sapp_macos_poll_input_events(void) {
     /*
 
     NOTE: late event polling temporarily out-commented to check if this

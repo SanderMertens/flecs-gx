@@ -1,5 +1,5 @@
 #include "canvas.h"
-#include "draw2d.h"
+#include "../geometry/geometry.h"
 
 ECS_COMPONENT_DECLARE(GxCanvas);
 
@@ -17,18 +17,35 @@ void GxCanvasInit(ecs_iter_t *it) {
         .logger = { slog_func }
     });
 
+    sgl_setup(&(sgl_desc_t){
+        .logger.func = slog_func
+    });
+
+    sfetch_setup(&(sfetch_desc_t){
+        .num_channels = 1,
+        .num_lanes = 4,
+        .logger.func = slog_func,
+    });
+
     ecs_world_t *world = it->world;
     GxCanvas *rc = ecs_get_mut(world, it->entities[0], GxCanvas);
     rc->width = 0;
     rc->height = 0;
-    gx_draw2d_init(world, rc);
+    rc->geometry = gx_geometry_init(world, rc);
+    rc->dpi_scale = sapp_dpi_scale();
 
     ecs_modified(world, it->entities[0], GxCanvas);
 }
 
 static
+void GxFetch(ecs_iter_t *it) {
+    sfetch_dowork();
+}
+
+static
 void GxCanvasPopulateGeometry2D(ecs_iter_t *it) {
-    gx_draw2d_populate_geometry(it->world, ecs_field(it, GxCanvas, 2));
+    GxCanvas *canvas = ecs_field(it, GxCanvas, 2);
+    gx_geometry_populate(it->world, canvas->geometry, canvas);
 }
 
 static
@@ -36,8 +53,15 @@ void GxCanvasBeginDraw(ecs_iter_t *it) {
     EcsCanvas *c = ecs_field(it, EcsCanvas, 1);
     GxCanvas *rc = ecs_field(it, GxCanvas, 2);
     int32_t prev_width = rc->width, prev_height = rc->height;
-    rc->width = sapp_width();
-    rc->height = sapp_height();
+    rc->actual_width = sapp_width();
+    rc->actual_height = sapp_height();
+    rc->width = rc->actual_width / rc->dpi_scale;
+    rc->height = rc->actual_height / rc->dpi_scale;
+
+    rc->viewport.left = 0;
+    rc->viewport.right = rc->width;
+    rc->viewport.top = rc->height;
+    rc->viewport.bottom = 0;
 
     if (prev_width != rc->width || prev_height != rc->height) {
         /* Resize offscreen buffers */
@@ -49,16 +73,17 @@ void GxCanvasBeginDraw(ecs_iter_t *it) {
     pa.colors[0].clear_value.g = c->background_color.g;
     pa.colors[0].clear_value.b = c->background_color.b;
     pa.colors[0].clear_value.a = 1.0;
-    sg_begin_default_pass(&pa, rc->width, rc->height);
+    sg_begin_default_pass(&pa, rc->actual_width, rc->actual_height);
 }
 
 static
-void GxCanvasDraw2D(ecs_iter_t *it) {
-    gx_draw2d_draw(it->world, ecs_field(it, GxCanvas, 2));
+void GxCanvasDrawGeometry(ecs_iter_t *it) {
+    gx_geometry_draw(it->world, ecs_field(it, GxCanvas, 2));
 }
 
 static
 void GxCanvasEndDraw(ecs_iter_t *it) {
+    sgl_draw();
     sg_end_pass();
 }
 
@@ -72,6 +97,7 @@ void FlecsGxCanvasImport(
 {
     ECS_MODULE(world, FlecsGxCanvas);
     ECS_IMPORT(world, FlecsComponentsGui);
+    ECS_IMPORT(world, FlecsGxGeometry);
 
     ecs_set_name_prefix(world, "Gx");
 
@@ -93,13 +119,15 @@ void FlecsGxCanvasImport(
         .no_readonly = true
     });
 
+    ECS_SYSTEM(world, GxFetch, EcsOnLoad, 0);
+
     ECS_SYSTEM(world, GxCanvasPopulateGeometry2D, EcsOnStore,
         flecs.components.gui.Canvas, Canvas);
 
     ECS_SYSTEM(world, GxCanvasBeginDraw, EcsOnStore, 
         flecs.components.gui.Canvas, Canvas);
 
-    ECS_SYSTEM(world, GxCanvasDraw2D, EcsOnStore,
+    ECS_SYSTEM(world, GxCanvasDrawGeometry, EcsOnStore,
         flecs.components.gui.Canvas, Canvas);
 
     ECS_SYSTEM(world, GxCanvasEndDraw, EcsOnStore, 
