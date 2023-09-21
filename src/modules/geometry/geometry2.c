@@ -120,8 +120,10 @@ void gx_geometry2_collect(
 
         // Calculate model matrix
         if (!t_parent) {
+            vec3 center = {canvas->width / 2, canvas->height / 2, 0};
             for (int32_t i = 0; i < it.count; i ++) {
                 glm_translate_make(t[i].mat, t[i].position);
+                glm_translate(t[i].mat, center);
                 glm_rotate(t[i].mat, t[i].rotation, axis);
             }
         } else {
@@ -135,38 +137,37 @@ void gx_geometry2_collect(
         if (aligned) {
             int32_t width = 0, height = 0;
             if (!t_parent) {
-                width = canvas->width;
-                height = canvas->height;
+                width = canvas->width / 2;
+                height = canvas->height / 2;
             } else {
-                width = t_parent[0].scale[0];
-                height = t_parent[0].scale[1];
+                width = t_parent[0].scale[0] / 2;
+                height = t_parent[0].scale[1] / 2;
             }
-
-            printf("width = %d, height = %d\n", width, height);
 
             for (int32_t i = 0; i < it.count; i ++) {
                 EcsAlign align = t[i].align;
                 int32_t align_x = 0, align_y = 0;
                 int32_t w = t[i].scale[0], h = t[i].scale[1];
                 if (align & EcsAlignLeft) {
-                    align_x = w / 2;
+                    align_x = w / 2 - width;
                 } else
                 if (align & EcsAlignCenter) {
-                    align_x = width / 2;
+                    align_x = 0;
                 }
                 if (align & EcsAlignRight) {
                     align_x = width - w / 2;
                 }
 
                 if (align & EcsAlignTop) {
-                    align_y = height - h / 2;
+                    align_y = h / 2 - height;
                 } else
                 if (align & EcsAlignMiddle) {
-                    align_y = height / 2;
+                    align_y = 0;
                 } else
                 if (align & EcsAlignBottom) {
-                    align_y = h / 2;
+                    align_y = height - h / 2;
                 }
+
                 if (align_x || align_y) {
                     glm_translate(t[i].mat, (vec3){align_x, align_y, 0});
                 }
