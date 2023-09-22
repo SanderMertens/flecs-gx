@@ -124,7 +124,6 @@ void gx_geometry2_collect(
             for (int32_t i = 0; i < it.count; i ++) {
                 glm_translate_make(t[i].mat, t[i].position);
                 glm_translate(t[i].mat, center);
-                glm_rotate(t[i].mat, t[i].rotation, axis);
             }
         } else {
             for (int32_t i = 0; i < it.count; i ++) {
@@ -220,12 +219,13 @@ void gx_geometry2_collect(
                     float w = t[i].scale[0];
                     float h = t[i].scale[1];
                     float sw = style->stroke_width;
+                    float sw_h = sw / 2;
                     float w_h = w / 2.0;
                     float h_h = h / 2.0;
 
                     { // Left
-                        vec3 pos = {-(w_h), 0, 0};
-                        vec3 scale = {sw, h + sw, 1};
+                        vec3 pos = {-w_h + sw_h, 0, 0};
+                        vec3 scale = {sw, h, 1};
 
                         glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
                         glm_scale(stroke_transform[cur], scale);
@@ -236,8 +236,8 @@ void gx_geometry2_collect(
                         cur ++;
                     }
                     { // Right
-                        vec3 pos = {(w_h), 0, 0};
-                        vec3 scale = {sw, h + sw, 1};
+                        vec3 pos = {w_h - sw_h, 0, 0};
+                        vec3 scale = {sw, h, 1};
 
                         glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
                         glm_scale(stroke_transform[cur], scale);
@@ -248,8 +248,8 @@ void gx_geometry2_collect(
                         cur ++;
                     }
                     { // Top
-                        vec3 pos = {0, (h_h), 0};
-                        vec3 scale = {w + sw, sw, 1};
+                        vec3 pos = {0, h_h - sw_h, 0};
+                        vec3 scale = {w, sw, 1};
 
                         glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
                         glm_scale(stroke_transform[cur], scale);
@@ -260,8 +260,8 @@ void gx_geometry2_collect(
                         cur ++;
                     }
                     { // Bottom
-                        vec3 pos = {0, -(h_h), 0};
-                        vec3 scale = {w + sw, sw, 1};
+                        vec3 pos = {0, -h_h + sw_h, 0};
+                        vec3 scale = {w, sw, 1};
 
                         glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
                         glm_scale(stroke_transform[cur], scale);
