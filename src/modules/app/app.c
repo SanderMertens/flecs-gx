@@ -111,9 +111,9 @@ void app_key_down(
     ecs_key_state_t *key)
 {
     if (key->state) {
-        key->pressed = false;
+        key->down = false;
     } else {
-        key->pressed = true;
+        key->down = true;
     }
 
     key->state = true;
@@ -124,6 +124,7 @@ static
 void app_key_up(
     ecs_key_state_t *key)
 {
+    key->up = true;
     key->current = false;
 }
 
@@ -133,9 +134,11 @@ void app_key_reset(
 {
     if (!state->current) {
         state->state = 0;
-        state->pressed = 0;
+        state->down = 0;
+        state->up = 0;
     } else if (state->state) {
-        state->pressed = 0;
+        state->down = 0;
+        state->up = 0;
     }
 }
 
@@ -154,9 +157,9 @@ void app_mouse_down(
     ecs_key_state_t *mouse)
 {
     if (mouse->state) {
-        mouse->pressed = false;
+        mouse->down = false;
     } else {
-        mouse->pressed = true;
+        mouse->down = true;
     }
 
     mouse->state = true;
@@ -167,6 +170,7 @@ static
 void app_mouse_up(
     ecs_key_state_t *mouse)
 {
+    mouse->up = true;
     mouse->current = false;
 }
 
@@ -176,9 +180,11 @@ void app_mouse_button_reset(
 {
     if (!mouse->current) {
         mouse->state = 0;
-        mouse->pressed = 0;
+        mouse->up = 0;
+        mouse->down = 0;
     } else if (mouse->state) {
-        mouse->pressed = 0;
+        mouse->up = 0;
+        mouse->down = 0;
     }
 }
 
@@ -188,6 +194,7 @@ void app_mouse_reset(
 {
     app_mouse_button_reset(&input->mouse.left);
     app_mouse_button_reset(&input->mouse.right);
+    input->mouse.moved = false;
 }
 
 static
@@ -231,6 +238,22 @@ void app_input_action(
         if (evt->mouse_button == SAPP_MOUSEBUTTON_RIGHT)
             app_mouse_up(&input->mouse.right);
         break;
+    case SAPP_EVENTTYPE_MOUSE_MOVE: {
+        float x = evt->mouse_x, y = evt->mouse_y;
+        int f_w = evt->framebuffer_width, f_h = evt->framebuffer_height;
+
+        if ((x > 0) && (y > 0) && (x < f_w) && (y < f_h)) {
+            float x_scale = (float)evt->window_width / (float)evt->framebuffer_width;
+            float y_scale = (float)evt->window_height / (float)evt->framebuffer_height;
+
+            input->mouse.moved = true;
+            input->mouse.window.x = evt->mouse_x * x_scale;
+            input->mouse.window.y = evt->mouse_y * y_scale;
+            input->mouse.view.x = input->mouse.window.x - ((float)evt->window_width / 2.0);
+            input->mouse.view.y = input->mouse.window.y - ((float)evt->window_height / 2.0);
+        }
+        break;
+    }
     case SAPP_EVENTTYPE_MOUSE_SCROLL:
         break;
     case SAPP_EVENTTYPE_KEY_UP:

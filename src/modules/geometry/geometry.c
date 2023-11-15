@@ -68,19 +68,5 @@ void FlecsGxGeometryImport(
         flecs.components.geometry.Line2,
         !GxStyleComputed);
 
-    // ecs_add_pair(world, ecs_id(EcsPosition2), 
-    //     EcsWith, ecs_id(GxTransform2Computed));
-    // ecs_add_pair(world, ecs_id(EcsAlign), 
-    //     EcsWith, ecs_id(GxTransform2Computed));
-    // ecs_add_pair(world, ecs_id(EcsRectangle), 
-    //     EcsWith, ecs_id(GxTransform2Computed));
-    // ecs_add_pair(world, ecs_id(EcsLine2), 
-    //     EcsWith, ecs_id(GxTransform2Computed));
-
-    // ecs_add_pair(world, ecs_id(EcsRectangle), 
-    //     EcsWith, ecs_id(GxStyleComputed));
-    // ecs_add_pair(world, ecs_id(EcsLine2), 
-    //     EcsWith, ecs_id(GxStyleComputed));
-
     gx_geometry2_import(world);
 }

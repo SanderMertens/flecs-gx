@@ -14,7 +14,29 @@ void FlecsGxImport(
 
 #ifdef __cplusplus
 }
-#endif
+
+namespace flecs {
+
+class gx {
+public:
+    gx(flecs::world& ecs) {
+        // Bind dependencies with modules
+        ecs.import<flecs::components::transform>();
+        ecs.import<flecs::components::geometry>();
+        ecs.import<flecs::components::graphics>();
+        ecs.import<flecs::components::input>();
+        ecs.import<flecs::components::gui>();
+
+        // Load module contents
+        FlecsGxImport(ecs);
+
+        // Bind C++ types with module contents
+        ecs.module<flecs::gx>();
+    }
+};
+
+}
 
 #endif
 
+#endif

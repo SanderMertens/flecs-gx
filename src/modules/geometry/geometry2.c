@@ -99,6 +99,66 @@ void gx_geometry2_matvp_make(mat4 mat_vp, gx_viewport_t *vp) {
 }
 
 static
+void gx_geometry_draw_border(
+    GxTransform2Computed *t,
+    GxStyleComputed *style,
+    vec3 *stroke_color,
+    mat4 *stroke_transform) 
+{
+    float w = t->scale[0];
+    float h = t->scale[1];
+    float sw = style->stroke_width;
+    float sw_h = sw / 2;
+    float w_h = w / 2.0;
+    float h_h = h / 2.0;
+
+    { // Left
+        vec3 pos = {-w_h + sw_h, 0, 0};
+        vec3 scale = {sw, h, 1};
+
+        glm_translate_to(t->mat, pos, stroke_transform[0]);
+        glm_scale(stroke_transform[0], scale);
+
+        stroke_color[0][0] = style->stroke_color[0];
+        stroke_color[0][1] = style->stroke_color[1];
+        stroke_color[0][2] = style->stroke_color[2];
+    }
+    { // Right
+        vec3 pos = {w_h - sw_h, 0, 0};
+        vec3 scale = {sw, h, 1};
+
+        glm_translate_to(t->mat, pos, stroke_transform[1]);
+        glm_scale(stroke_transform[1], scale);
+
+        stroke_color[1][0] = style->stroke_color[0];
+        stroke_color[1][1] = style->stroke_color[1];
+        stroke_color[1][2] = style->stroke_color[2];
+    }
+    { // Top
+        vec3 pos = {0, h_h - sw_h, 0};
+        vec3 scale = {w, sw, 1};
+
+        glm_translate_to(t->mat, pos, stroke_transform[2]);
+        glm_scale(stroke_transform[2], scale);
+
+        stroke_color[2][0] = style->stroke_color[0];
+        stroke_color[2][1] = style->stroke_color[1];
+        stroke_color[2][2] = style->stroke_color[2];
+    }
+    { // Bottom
+        vec3 pos = {0, -h_h + sw_h, 0};
+        vec3 scale = {w, sw, 1};
+
+        glm_translate_to(t->mat, pos, stroke_transform[3]);
+        glm_scale(stroke_transform[3], scale);
+
+        stroke_color[3][0] = style->stroke_color[0];
+        stroke_color[3][1] = style->stroke_color[1];
+        stroke_color[3][2] = style->stroke_color[2];
+    }
+}
+
+static
 void gx_geometry2_collect(
     ecs_world_t *world,
     gx_geometry2_data_t *geometry,
@@ -139,8 +199,8 @@ void gx_geometry2_collect(
                 width = canvas->width / 2;
                 height = canvas->height / 2;
             } else {
-                width = t_parent[0].scale[0] / 2;
-                height = t_parent[0].scale[1] / 2;
+                width = t_parent[0].scale[0] / 2 - t_parent[0].padding;
+                height = t_parent[0].scale[1] / 2 - t_parent[0].padding;
             }
 
             for (int32_t i = 0; i < it.count; i ++) {
@@ -170,106 +230,48 @@ void gx_geometry2_collect(
                 if (align_x || align_y) {
                     glm_translate(t[i].mat, (vec3){align_x, align_y, 0});
                 }
-            }
-            
+            }        
         }
 
         // Draw solid objects
         if (s) {
+            vec3 *color = NULL;
+            mat4 *transform = NULL;
+            int32_t cur = 0;
+
+            for (int32_t i = 0; i < it.count; i ++) {
+                with_stroke += s[i].stroke_width > 0;
+            }
+
+            color = ecs_vec_grow_t(NULL, &geometry->color, vec3, 
+                is_solid * it.count + with_stroke * 4);
+            transform = ecs_vec_grow_t(NULL, &geometry->transform, mat4, 
+                is_solid * it.count + with_stroke * 4);
+
+            // Populate matrix & color
             if (is_solid) {
-                vec3 *color = NULL;
-                mat4 *transform = NULL;
-
-                color = ecs_vec_grow_t(NULL, &geometry->color, vec3, it.count);
-                transform = ecs_vec_grow_t(NULL, &geometry->transform, mat4, it.count);
-
-                // Populate matrix
                 for (int32_t i = 0; i < it.count; i ++) {
-                    glm_mat4_copy(t[i].mat, transform[i]);
-                    glm_scale(transform[i], t[i].scale);
-                }
+                    glm_mat4_copy(t[i].mat, transform[cur]);
+                    glm_scale(transform[cur], t[i].scale);
 
-                // Populate color
-                for (int32_t i = 0; i < it.count; i ++) {
-                    color[i][0] = s[i].color[0];
-                    color[i][1] = s[i].color[1];
-                    color[i][2] = s[i].color[2];
-                    with_stroke += s[i].stroke_width > 0;
+                    color[cur][0] = s[i].color[0];
+                    color[cur][1] = s[i].color[1];
+                    color[cur][2] = s[i].color[2];
+
+                    cur ++;
+
+                    if (s[i].stroke_width != 0) {
+                        gx_geometry_draw_border(&t[i], &s[i],
+                            &color[cur], &transform[cur]);
+                        cur += 4;
+                    }
                 }
             } else {
                 for (int32_t i = 0; i < it.count; i ++) {
-                    with_stroke += s[i].stroke_width > 0;
-                }
-            }
-
-            // Draw borders
-            if (with_stroke) {
-                vec3 *stroke_color = ecs_vec_grow_t(
-                    NULL, &geometry->color, vec3, with_stroke * 4);
-                mat4 *stroke_transform = ecs_vec_grow_t(
-                    NULL, &geometry->transform, mat4, with_stroke * 4);
-                int32_t cur = 0;
-
-                for (int32_t i = 0; i < it.count; i ++) {
-                    GxStyleComputed *style = &s[i];
-                    if (style->stroke_width == 0) {
-                        continue;
-                    }
-
-                    float w = t[i].scale[0];
-                    float h = t[i].scale[1];
-                    float sw = style->stroke_width;
-                    float sw_h = sw / 2;
-                    float w_h = w / 2.0;
-                    float h_h = h / 2.0;
-
-                    { // Left
-                        vec3 pos = {-w_h + sw_h, 0, 0};
-                        vec3 scale = {sw, h, 1};
-
-                        glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
-                        glm_scale(stroke_transform[cur], scale);
-
-                        stroke_color[cur][0] = style->stroke_color[0];
-                        stroke_color[cur][1] = style->stroke_color[1];
-                        stroke_color[cur][2] = style->stroke_color[2];
-                        cur ++;
-                    }
-                    { // Right
-                        vec3 pos = {w_h - sw_h, 0, 0};
-                        vec3 scale = {sw, h, 1};
-
-                        glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
-                        glm_scale(stroke_transform[cur], scale);
-
-                        stroke_color[cur][0] = style->stroke_color[0];
-                        stroke_color[cur][1] = style->stroke_color[1];
-                        stroke_color[cur][2] = style->stroke_color[2];
-                        cur ++;
-                    }
-                    { // Top
-                        vec3 pos = {0, h_h - sw_h, 0};
-                        vec3 scale = {w, sw, 1};
-
-                        glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
-                        glm_scale(stroke_transform[cur], scale);
-
-                        stroke_color[cur][0] = style->stroke_color[0];
-                        stroke_color[cur][1] = style->stroke_color[1];
-                        stroke_color[cur][2] = style->stroke_color[2];
-                        cur ++;
-                    }
-                    { // Bottom
-                        vec3 pos = {0, -h_h + sw_h, 0};
-                        vec3 scale = {w, sw, 1};
-
-                        glm_translate_to(t[i].mat, pos, stroke_transform[cur]);
-                        glm_scale(stroke_transform[cur], scale);
-
-                        stroke_color[cur][0] = style->stroke_color[0];
-                        stroke_color[cur][1] = style->stroke_color[1];
-                        stroke_color[cur][2] = style->stroke_color[2];
-                        cur ++;
+                    if (s[i].stroke_width != 0) {
+                        gx_geometry_draw_border(&t[i], &s[i],
+                            &color[cur], &transform[cur]);
+                        cur += 4;
                     }
                 }
             }
@@ -397,8 +399,9 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
     EcsRotation2 *r = ecs_field(it, EcsRotation2, 3);
     EcsRgb *c = ecs_field(it, EcsRgb, 4);
     EcsStroke *st = ecs_field(it, EcsStroke, 5);
-    GxTransform2Computed *t = ecs_field(it, GxTransform2Computed, 6);
-    GxStyleComputed *cc = ecs_field(it, GxStyleComputed, 7);
+    EcsPadding *padding = ecs_field(it, EcsPadding, 6);
+    GxTransform2Computed *t = ecs_field(it, GxTransform2Computed, 7);
+    GxStyleComputed *cc = ecs_field(it, GxStyleComputed, 8);
 
     if (p) {
         for (int32_t i = 0; i < it->count; i ++) {
@@ -457,6 +460,12 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
             cc[i].stroke_color[1] = 0;
             cc[i].stroke_color[2] = 0;
             cc[i].stroke_width = 0;
+        }
+    }
+
+    if (padding) {
+        for (int32_t i = 0; i < it->count; i ++) {
+            t[i].padding = padding[i].value;
         }
     }
 }
@@ -564,6 +573,7 @@ void gx_geometry2_import(
         [in]  ?flecs.components.transform.Rotation2,
         [in]  ?flecs.components.graphics.Rgb,
         [in]  ?flecs.components.geometry.Stroke,
+        [in]  ?flecs.components.gui.Padding,
         [out] GxTransform2Computed,
         [out] GxStyleComputed);
 

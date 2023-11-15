@@ -66,6 +66,7 @@ ECS_STRUCT(GxTransform2Computed, {
     vec3 scale;
     float rotation;
     EcsAlign align;
+    float padding;
 ECS_PRIVATE
     mat4 mat;
 });

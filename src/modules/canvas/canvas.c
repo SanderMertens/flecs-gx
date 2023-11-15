@@ -119,7 +119,8 @@ void FlecsGxCanvasImport(
         .no_readonly = true
     });
 
-    ECS_SYSTEM(world, GxFetch, EcsOnLoad, 0);
+    ECS_SYSTEM(world, GxFetch, EcsOnLoad, 
+        [none] flecs.components.gui.Canvas);
 
     ECS_SYSTEM(world, GxCanvasPopulateGeometry2D, EcsOnStore,
         flecs.components.gui.Canvas, Canvas);
@@ -133,5 +134,6 @@ void FlecsGxCanvasImport(
     ECS_SYSTEM(world, GxCanvasEndDraw, EcsOnStore, 
         flecs.components.gui.Canvas, Canvas);
 
-    ECS_SYSTEM(world, GxCanvasCommit, EcsOnStore, 0);
+    ECS_SYSTEM(world, GxCanvasCommit, EcsOnStore, 
+        [none] flecs.components.gui.Canvas);
 }

@@ -33,5 +33,16 @@
             },
             "embed": ["etc/sokol/shaders"]
         }
-    } 
+    },
+    "dependee": {
+        "value": {
+            "use": [
+                "flecs.components.gui",
+                "flecs.components.input",
+                "flecs.components.graphics",
+                "flecs.components.transform",
+                "flecs.components.geometry"
+            ]
+        }
+    }
 }
