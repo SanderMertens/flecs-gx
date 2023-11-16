@@ -17,6 +17,30 @@ bool gx_is_point_inside(
 }
 
 static
+void gx_event_emit(
+    ecs_world_t *world,
+    ecs_entity_t entity,
+    EcsInputState *state,
+    EcsEventListener *listener,
+    ecs_iter_action_t callback)
+{
+    ecs_iter_t it = {0};
+
+    it.real_world = ECS_CONST_CAST(ecs_world_t*, ecs_get_world(world));
+    it.world = world;
+    it.table = ecs_get_table(world, entity);
+    it.count = 1;
+    it.entities = (ecs_entity_t[]){ entity };
+    it.ids = (ecs_id_t[]){ ecs_id(EcsInputState) };
+    it.columns = (int32_t[]){ 1 };
+    it.sources = (ecs_entity_t[]){ 0 };
+    it.ptrs = (void*[]){ state };
+    it.binding_ctx = listener->binding_ctx;
+    it.ctx = listener->ctx;
+    callback(&it);
+}
+
+static
 bool gx_on_mouse_move(
     ecs_world_t *world,
     ecs_entity_t entity,
@@ -38,7 +62,7 @@ bool gx_on_mouse_move(
         if (!entered && !s->hover) {
             s->hover = true;
             if (l->on_enter) {
-                l->on_enter(world, entity, s);
+                gx_event_emit(world, entity, s, l, l->on_enter);
                 entered = true;
             }
         } else {
@@ -46,7 +70,7 @@ bool gx_on_mouse_move(
                 /* Can't hover over two elements at the same time */
                 if (s->hover && l->on_leave) {
                     s->hover = false;
-                    l->on_leave(world, entity, s);
+                    gx_event_emit(world, entity, s, l, l->on_leave);
                 }
             } else {
                 entered = true;
@@ -55,22 +79,23 @@ bool gx_on_mouse_move(
     }
 
     if (s->drag) {
-        s->drag = l->on_drag(world, entity, s);
+        gx_event_emit(world, entity, s, l, l->on_drag);
     } else if (s->hover && s->lmb_down && l->on_drag) {
         /* Set drag anchor for more precise control over position 
          * while dragging. */
         s->drag_anchor_x = mouse_x - t->position[0];
         s->drag_anchor_y = mouse_y - t->position[1];
-        s->drag = l->on_drag(world, entity, s);
+        gx_event_emit(world, entity, s, l, l->on_drag);
     }
 
+    /* If mouse is not inside element and we're not dragging, lose hover */
     if (!mouse_inside && !s->drag) {
         if (s->hover) {
             s->hover = false;
             s->lmb_down = false;
             s->rmb_down = false;
             if (l->on_leave) {
-                l->on_leave(world, entity, s);
+                gx_event_emit(world, entity, s, l, l->on_leave);
             }
         }
     }
@@ -91,7 +116,7 @@ bool gx_on_mouse_left_down(
     if (gx_is_point_inside(t, mouse_x, mouse_y)) {
         s->lmb_down = true;
         if (l->on_lmb_down) {
-            l->on_lmb_down(world, entity, s);
+            gx_event_emit(world, entity, s, l, l->on_lmb_down);
             return true;
         }
     }
@@ -112,7 +137,7 @@ void gx_on_mouse_left_up(
         s->lmb_down = false;
         s->drag = false;
         if (gx_is_point_inside(t, mouse_x, mouse_y) && l->on_lmb_up) {
-            l->on_lmb_up(world, entity, s);
+            gx_event_emit(world, entity, s, l, l->on_lmb_up);
         }
     }
 }
@@ -130,7 +155,7 @@ bool gx_on_mouse_right_down(
     if (gx_is_point_inside(t, mouse_x, mouse_y)) {
         s->rmb_down = true;
         if (l->on_rmb_down) {
-            l->on_rmb_down(world, entity, s);
+            gx_event_emit(world, entity, s, l, l->on_rmb_down);
             return true;
         }
     }
@@ -150,7 +175,7 @@ void gx_on_mouse_right_up(
     if (s->rmb_down) {
         s->rmb_down = false;
         if (gx_is_point_inside(t, mouse_x, mouse_y) && l->on_rmb_up) {
-            l->on_rmb_up(world, entity, s);
+            gx_event_emit(world, entity, s, l, l->on_rmb_up);
         }
     }
 }
@@ -163,7 +188,7 @@ void Dispatch(ecs_iter_t *system_it) {
 
     ecs_mouse_state_t *mouse = &input->mouse;
     if (!mouse->moved && !mouse->left.down && !mouse->left.up &&
-        !mouse->right.down && !mouse->right.down)
+        !mouse->right.down && !mouse->right.up)
     {
         return;
     }

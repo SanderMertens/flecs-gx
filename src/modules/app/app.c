@@ -225,18 +225,22 @@ void app_input_action(
 
     switch (evt->type) {
     case SAPP_EVENTTYPE_MOUSE_DOWN:
-        if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT)
+        if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
             app_mouse_down(&input->mouse.left);
+        }
         
-        if (evt->mouse_button == SAPP_MOUSEBUTTON_RIGHT)
+        if (evt->mouse_button == SAPP_MOUSEBUTTON_RIGHT) {
             app_mouse_down(&input->mouse.right);
+        }
         break;
     case SAPP_EVENTTYPE_MOUSE_UP:
-        if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT)
+        if (evt->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
             app_mouse_up(&input->mouse.left);
+        }
         
-        if (evt->mouse_button == SAPP_MOUSEBUTTON_RIGHT)
+        if (evt->mouse_button == SAPP_MOUSEBUTTON_RIGHT) {
             app_mouse_up(&input->mouse.right);
+        }
         break;
     case SAPP_EVENTTYPE_MOUSE_MOVE: {
         float x = evt->mouse_x, y = evt->mouse_y;
