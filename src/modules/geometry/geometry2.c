@@ -10,24 +10,35 @@ typedef struct gx_geometry_vs_uniforms_t {
     mat4 mat_vp;
 } gx_geometry_vs_uniforms_t;
 
-typedef struct gx_geometry_vs_data_t {
-    vec3 *colors;
-    mat4 *transforms;
-} gx_geometry_vs_data_t;
-
-static
-vec3 gx_geometry_rect_verts[] = {
+static vec3 gx_geometry_rect_verts[] = {
     {-0.5,  0.5, 0.0},
     { 0.5,  0.5, 0.0},
     { 0.5, -0.5, 0.0},
     {-0.5, -0.5, 0.0},
 };
 
-static
-uint16_t gx_geometry_rect_idx[] = {
+static uint16_t gx_geometry_rect_idx[] = {
     0, 1, 2,
     0, 2, 3
 };
+
+gx_mesh2_t gx_make_rect(void) {
+    gx_mesh2_t result;
+    result.verts = sg_make_buffer(&(sg_buffer_desc){
+        .data = SG_RANGE(gx_geometry_rect_verts),
+        .label = "rect_verts"
+    });
+
+    result.idx = sg_make_buffer(&(sg_buffer_desc){
+        .data = SG_RANGE(gx_geometry_rect_idx),
+        .label = "rect_idx",
+        .type = SG_BUFFERTYPE_INDEXBUFFER
+    });
+
+    result.index_count = 6;
+
+    return result;
+}
 
 static
 sg_pipeline gx_geometry_init_pipeline(void) {
@@ -37,12 +48,12 @@ sg_pipeline gx_geometry_init_pipeline(void) {
         LAYOUT(POSITION_I)  "in vec3 v_position;\n"
         LAYOUT(COLOR_I)     "in vec3 i_color;\n"
         LAYOUT(TRANSFORM_I) "in mat4 i_mat_m;\n"
-        "#include \"etc/flecs-gx/shaders/draw2d_vert.glsl\"\n"
+        "#include \"etc/flecs-gx/shaders/geometry2_vert.glsl\"\n"
     );
 
     char *fs = gx_shader_from_str(
         SOKOL_SHADER_HEADER
-        "#include \"etc/flecs-gx/shaders/draw2d_frag.glsl\"\n"
+        "#include \"etc/flecs-gx/shaders/geometry2_frag.glsl\"\n"
     );
 
     sg_shader shd = sg_make_shader(&(sg_shader_desc){
@@ -91,11 +102,6 @@ sg_pipeline gx_geometry_init_pipeline(void) {
         .cull_mode = SG_CULLMODE_FRONT,
         .sample_count = 1
     });
-}
-
-static
-void gx_geometry2_matvp_make(mat4 mat_vp, gx_viewport_t *vp) {
-    glm_ortho(vp->left, vp->right, vp->top, vp->bottom, -1.0, 1.0, mat_vp);
 }
 
 static
@@ -158,6 +164,82 @@ void gx_geometry_draw_border(
     }
 }
 
+void gx_transform2(
+    GxTransform2Computed *t,
+    GxTransform2Computed *t_parent,
+    int32_t count,
+    GxCanvas *canvas)
+{
+    vec3 axis = {0.0, 0.0, 1.0};
+    vec3 center = {canvas->width / 2, canvas->height / 2, 0};
+
+    if (!t_parent) {
+        for (int32_t i = 0; i < count; i ++) {
+            glm_translate_make(t[i].mat, t[i].position);
+            glm_translate(t[i].mat, center);
+        }
+    } else {
+        for (int32_t i = 0; i < count; i ++) {
+            glm_translate_to(t_parent[i].mat, t[i].position, t[i].mat);
+            glm_rotate(t[i].mat, t[i].rotation, axis);
+        }
+    }
+}
+
+void gx_align2(
+    GxTransform2Computed *t,
+    GxTransform2Computed *t_parent,
+    int32_t count,
+    GxCanvas *canvas)
+{
+    int32_t width = 0, height = 0;
+    if (!t_parent) {
+        width = canvas->width / 2;
+        height = canvas->height / 2;
+    } else {
+        width = t_parent[0].scale[0] / 2 - t_parent[0].padding;
+        height = t_parent[0].scale[1] / 2 - t_parent[0].padding;
+    }
+
+    for (int32_t i = 0; i < count; i ++) {
+        EcsAlign align = t[i].align;
+        int32_t align_x = 0, align_y = 0;
+        int32_t w = t[i].scale[0], h = t[i].scale[1];
+        if (align & EcsAlignLeft) {
+            align_x = w / 2 - width;
+        } else
+        if (align & EcsAlignCenter) {
+            align_x = 0;
+        }
+        if (align & EcsAlignRight) {
+            align_x = width - w / 2;
+        }
+
+        if (align & EcsAlignTop) {
+            align_y = h / 2 - height;
+        } else
+        if (align & EcsAlignMiddle) {
+            align_y = 0;
+        } else
+        if (align & EcsAlignBottom) {
+            align_y = height - h / 2;
+        }
+
+        if (align_x || align_y) {
+            glm_translate(t[i].mat, (vec3){align_x, align_y, 0});
+        }
+    }
+}
+
+void gx_scale2(
+    GxTransform2Computed *t,
+    int32_t count)
+{
+    for (int32_t i = 0; i < count; i ++) {
+        glm_scale(t[i].mat, t[i].scale);
+    }
+}
+
 static
 void gx_geometry2_collect(
     ecs_world_t *world,
@@ -166,8 +248,6 @@ void gx_geometry2_collect(
 {
     ecs_vec_reset_t(NULL, &geometry->color, vec3);
     ecs_vec_reset_t(NULL, &geometry->transform, mat4);
-
-    vec3 axis = {0.0, 0.0, 1.0};
 
     ecs_iter_t it = ecs_query_iter(world, geometry->query);
     while (ecs_query_next(&it)) {
@@ -178,59 +258,10 @@ void gx_geometry2_collect(
         bool aligned = ecs_field_is_set(&it, 6);
         int32_t with_stroke = 0;
 
-        // Calculate model matrix
-        if (!t_parent) {
-            vec3 center = {canvas->width / 2, canvas->height / 2, 0};
-            for (int32_t i = 0; i < it.count; i ++) {
-                glm_translate_make(t[i].mat, t[i].position);
-                glm_translate(t[i].mat, center);
-            }
-        } else {
-            for (int32_t i = 0; i < it.count; i ++) {
-                glm_translate_to(t_parent[i].mat, t[i].position, t[i].mat);
-                glm_rotate(t[i].mat, t[i].rotation, axis);
-            }
-        }
+        gx_transform2(t, t_parent, it.count, canvas);
 
-        // Align items
         if (aligned) {
-            int32_t width = 0, height = 0;
-            if (!t_parent) {
-                width = canvas->width / 2;
-                height = canvas->height / 2;
-            } else {
-                width = t_parent[0].scale[0] / 2 - t_parent[0].padding;
-                height = t_parent[0].scale[1] / 2 - t_parent[0].padding;
-            }
-
-            for (int32_t i = 0; i < it.count; i ++) {
-                EcsAlign align = t[i].align;
-                int32_t align_x = 0, align_y = 0;
-                int32_t w = t[i].scale[0], h = t[i].scale[1];
-                if (align & EcsAlignLeft) {
-                    align_x = w / 2 - width;
-                } else
-                if (align & EcsAlignCenter) {
-                    align_x = 0;
-                }
-                if (align & EcsAlignRight) {
-                    align_x = width - w / 2;
-                }
-
-                if (align & EcsAlignTop) {
-                    align_y = h / 2 - height;
-                } else
-                if (align & EcsAlignMiddle) {
-                    align_y = 0;
-                } else
-                if (align & EcsAlignBottom) {
-                    align_y = height - h / 2;
-                }
-
-                if (align_x || align_y) {
-                    glm_translate(t[i].mat, (vec3){align_x, align_y, 0});
-                }
-            }        
+            gx_align2(t, t_parent, it.count, canvas);
         }
 
         // Draw solid objects
@@ -321,23 +352,13 @@ void gx_geometry2_init_rect(
             { .id = ecs_id(GxStyleComputed), .inout = EcsIn, .oper = EcsOptional },
             { .id = ecs_id(EcsRgb),   .inout = EcsInOutNone, .oper = EcsOptional },
             { .id = ecs_id(EcsLine2), .inout = EcsInOutNone, .oper = EcsOptional },
-            { .id = ecs_id(EcsAlign), .inout = EcsInOutNone, .oper = EcsOptional }
+            { .id = ecs_id(EcsAlign), .inout = EcsInOutNone, .oper = EcsOptional },
+            { .id = ecs_id(EcsCornerRadius), .inout = EcsInOutNone, .oper = EcsNot }
         }
     });
 
     // Create vertex & index buffers for rectangle geometry
-    geometry->verts = sg_make_buffer(&(sg_buffer_desc){
-        .data = SG_RANGE(gx_geometry_rect_verts),
-        .label = "rect_verts"
-    });
-
-    geometry->idx = sg_make_buffer(&(sg_buffer_desc){
-        .data = SG_RANGE(gx_geometry_rect_idx),
-        .label = "rect_idx",
-        .type = SG_BUFFERTYPE_INDEXBUFFER
-    });
-
-    geometry->index_count = 6;
+    geometry->mesh = gx_make_rect();
 }
 
 static
@@ -350,15 +371,15 @@ void gx_geometry2_data_draw(
 
     sg_bindings bind = {
         .vertex_buffers = {
-            [POSITION_I] =  geometry->verts,
+            [POSITION_I] =  geometry->mesh.verts,
             [COLOR_I] =     geometry->color_buf,
             [TRANSFORM_I] = geometry->transform_buf
         },
-        .index_buffer = geometry->idx
+        .index_buffer = geometry->mesh.idx
     };
 
     sg_apply_bindings(&bind);
-    sg_draw(0, geometry->index_count, geometry->instance_count);
+    sg_draw(0, geometry->mesh.index_count, geometry->instance_count);
 }
 
 static
@@ -400,8 +421,9 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
     EcsRgb *c = ecs_field(it, EcsRgb, 4);
     EcsStroke *st = ecs_field(it, EcsStroke, 5);
     EcsPadding *padding = ecs_field(it, EcsPadding, 6);
-    GxTransform2Computed *t = ecs_field(it, GxTransform2Computed, 7);
-    GxStyleComputed *cc = ecs_field(it, GxStyleComputed, 8);
+    EcsCornerRadius *corner_radius = ecs_field(it, EcsCornerRadius, 7);
+    GxTransform2Computed *t = ecs_field(it, GxTransform2Computed, 8);
+    GxStyleComputed *cc = ecs_field(it, GxStyleComputed, 9);
 
     if (p) {
         for (int32_t i = 0; i < it->count; i ++) {
@@ -460,6 +482,16 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
             cc[i].stroke_color[1] = 0;
             cc[i].stroke_color[2] = 0;
             cc[i].stroke_width = 0;
+        }
+    }
+
+    if (corner_radius) {
+        for (int32_t i = 0; i < it->count; i ++) {
+            cc[i].corner_radius = corner_radius[i].value;
+        }
+    } else {
+        for (int32_t i = 0; i < it->count; i ++) {
+            cc[i].corner_radius = 0;
         }
     }
 
@@ -549,7 +581,7 @@ void gx_geometry2_draw(
     GxCanvas *canvas)
 {
     gx_geometry_vs_uniforms_t vs_u;
-    gx_geometry2_matvp_make(vs_u.mat_vp, &canvas->viewport);
+    gx_geometry_matvp_make(vs_u.mat_vp, &canvas->viewport);
 
     sg_apply_pipeline(geometry->pip);
     sg_apply_uniforms(SG_SHADERSTAGE_VS, 0, 
@@ -562,28 +594,35 @@ void gx_geometry2_import(
     ecs_world_t *world)
 {
     ECS_SYSTEM(world, GxGeometryPopulateDof, EcsOnStore, 
-        [in]  ?flecs.components.transform.Position2, 
-        [in]  ?flecs.components.transform.Rotation2,
-        [out] GxTransform2Computed,        
-              !GxStyleComputed);
+        [in]   ?flecs.components.transform.Position2, 
+        [in]   ?flecs.components.transform.Rotation2,
+        [out]  GxTransform2Computed,        
+               !GxStyleComputed);
 
     ECS_SYSTEM(world, GxGeometryPopulateRect, EcsOnStore, 
-        [in]  flecs.components.geometry.Rectangle, 
-        [in]  ?flecs.components.transform.Position2, 
-        [in]  ?flecs.components.transform.Rotation2,
-        [in]  ?flecs.components.graphics.Rgb,
-        [in]  ?flecs.components.geometry.Stroke,
-        [in]  ?flecs.components.gui.Padding,
-        [out] GxTransform2Computed,
-        [out] GxStyleComputed);
+        [in]   flecs.components.geometry.Rectangle, 
+        [in]   ?flecs.components.transform.Position2, 
+        [in]   ?flecs.components.transform.Rotation2,
+        [in]   ?flecs.components.graphics.Rgb,
+        [in]   ?flecs.components.geometry.Stroke,
+        [in]   ?flecs.components.gui.Padding,
+        [in]   ?flecs.components.geometry.CornerRadius,
+        [out]  GxTransform2Computed,
+        [out]  GxStyleComputed);
 
     ECS_SYSTEM(world, GxGeometryPopulateLine2, EcsOnStore, 
-        [in]  flecs.components.geometry.Line2, 
-        [in]  ?flecs.components.geometry.Stroke,
-        [out] GxTransform2Computed,
-        [out] GxStyleComputed);
+        [in]   flecs.components.geometry.Line2, 
+        [in]   ?flecs.components.geometry.Stroke,
+        [out]  GxTransform2Computed,
+        [out]  GxStyleComputed);
 
     ECS_SYSTEM(world, GxGeometryPopulateAlign, EcsOnStore, 
-        [in]  ?flecs.components.gui.Align,
-        [out] GxTransform2Computed);
+        [in]   ?flecs.components.gui.Align,
+        [out]  GxTransform2Computed);
 }
+
+#undef POSITION_I
+#undef COLOR_I
+#undef TRANSFORM_I
+#undef LAYOUT_I_STR
+#undef LAYOUT

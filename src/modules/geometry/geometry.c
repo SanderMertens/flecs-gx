@@ -1,14 +1,14 @@
 #define FLECS_GX_GEOMETRY_IMPL
 #include "geometry.h"
 #include "geometry2.h"
+#include "rounded_rect.h"
 #include "text.h"
 
-void gx_geometry_populate(
-    ecs_world_t *world,
-    gx_geometry_t*ctx,
-    GxCanvas *canvas)
+void gx_geometry_matvp_make(
+    mat4 mat_vp, 
+    gx_viewport_t *vp) 
 {
-    gx_geometry2_populate(world, &ctx->geometry2, canvas);
+    glm_ortho(vp->left, vp->right, vp->top, vp->bottom, -1.0, 1.0, mat_vp);
 }
 
 gx_geometry_t* gx_geometry_init(
@@ -18,9 +18,19 @@ gx_geometry_t* gx_geometry_init(
     gx_geometry_t *ctx = ecs_os_calloc_t(gx_geometry_t);
 
     gx_geometry2_init(world, &ctx->geometry2);
+    gx_rounded_rect_init(world, &ctx->rounded_rect);
     gx_text_init(world, &ctx->text, canvas);
 
     return ctx;
+}
+
+void gx_geometry_populate(
+    ecs_world_t *world,
+    gx_geometry_t*ctx,
+    GxCanvas *canvas)
+{
+    gx_geometry2_populate(world, &ctx->geometry2, canvas);
+    gx_rounded_rect_populate(world, &ctx->rounded_rect, canvas);
 }
 
 void gx_geometry_draw(
@@ -30,6 +40,7 @@ void gx_geometry_draw(
     gx_geometry_t *ctx = canvas->geometry;
 
     gx_geometry2_draw(&ctx->geometry2, canvas);
+    gx_rounded_rect_draw(world, &ctx->rounded_rect, canvas);
     gx_text_draw(world, &ctx->text, canvas);
 }
 

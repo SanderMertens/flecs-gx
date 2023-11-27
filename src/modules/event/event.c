@@ -21,7 +21,7 @@ void gx_event_emit(
     ecs_world_t *world,
     ecs_entity_t entity,
     EcsInputState *state,
-    EcsEventListener *listener,
+    const EcsEventListener *listener,
     ecs_iter_action_t callback)
 {
     ecs_iter_t it = {0};
@@ -37,7 +37,8 @@ void gx_event_emit(
     it.ptrs = (void*[]){ state };
     it.binding_ctx = listener->binding_ctx;
     it.ctx = listener->ctx;
-    callback(&it);
+    
+    callback(&it); // callback in EventListener
 }
 
 static
@@ -251,6 +252,17 @@ void Dispatch(ecs_iter_t *system_it) {
                     &transform[i], &listeners[i], &input_state[i], 
                     input->mouse.view.x, input->mouse.view.y);
             }
+        }
+    }
+
+    /* Fallback on singleton handler in case no matching entity was found */
+    if (mouse->left.down && !lmb) {
+        const EcsEventListener *l = ecs_singleton_get(world, EcsEventListener);
+        if (l && l->on_lmb_down) {
+            EcsInputState *input_state = 
+                ecs_get_mut(world, ecs_id(EcsEventListener), EcsInputState);
+            gx_event_emit(world, ecs_id(EcsEventListener), input_state, 
+                l, l->on_lmb_down);
         }
     }
 }
