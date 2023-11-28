@@ -28,7 +28,7 @@ sg_pipeline gx_rounded_rect_init_pipeline(void) {
         LAYOUT(POSITION_I)      "in vec3 v_position;\n"
         LAYOUT(COLOR_I)         "in vec3 i_color;\n"
         LAYOUT(SIZE_I)          "in vec3 i_size;\n"
-        LAYOUT(CORNER_RADIUS_I) "in float i_corner_radius;\n"
+        LAYOUT(CORNER_RADIUS_I) "in vec4 i_corner_radius;\n"
         LAYOUT(STROKE_COLOR_I)  "in vec3 i_stroke_color;\n"
         LAYOUT(STROKE_WIDTH_I)  "in float i_stroke_width;\n"
         LAYOUT(TRANSFORM_I)     "in mat4 i_mat_m;\n"
@@ -70,7 +70,7 @@ sg_pipeline gx_rounded_rect_init_pipeline(void) {
             .buffers = {
                 [COLOR_I]          = { .stride = 12, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
                 [SIZE_I]           = { .stride = 8, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
-                [CORNER_RADIUS_I]  = { .stride = 4, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
+                [CORNER_RADIUS_I]  = { .stride = 16, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
                 [STROKE_COLOR_I]   = { .stride = 12, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
                 [STROKE_WIDTH_I]   = { .stride = 4, .step_func = SG_VERTEXSTEP_PER_INSTANCE },
                 [TRANSFORM_I]      = { .stride = 64, .step_func = SG_VERTEXSTEP_PER_INSTANCE }
@@ -83,7 +83,7 @@ sg_pipeline gx_rounded_rect_init_pipeline(void) {
                 /* Per instance */
                 [COLOR_I]         = { .buffer_index = COLOR_I,         .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT3 },
                 [SIZE_I]          = { .buffer_index = SIZE_I,          .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT2 },
-                [CORNER_RADIUS_I] = { .buffer_index = CORNER_RADIUS_I, .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT },
+                [CORNER_RADIUS_I] = { .buffer_index = CORNER_RADIUS_I, .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT4 },
                 [STROKE_COLOR_I]  = { .buffer_index = STROKE_COLOR_I,  .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT3 },
                 [STROKE_WIDTH_I]  = { .buffer_index = STROKE_WIDTH_I,  .offset = 0,  .format = SG_VERTEXFORMAT_FLOAT },
 
@@ -153,7 +153,7 @@ void gx_rounded_rect_update(
             geometry->color_buf = sg_make_buffer(&(sg_buffer_desc){
                 .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
             geometry->corner_radius_buf = sg_make_buffer(&(sg_buffer_desc){
-                .size = new_size * sizeof(float), .usage = SG_USAGE_STREAM });
+                .size = new_size * sizeof(vec4), .usage = SG_USAGE_STREAM });
             geometry->stroke_color_buf = sg_make_buffer(&(sg_buffer_desc){
                 .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
             geometry->stroke_width_buf = sg_make_buffer(&(sg_buffer_desc){
@@ -173,8 +173,8 @@ void gx_rounded_rect_update(
             ecs_vec_first_t(&geometry->color, vec3),
                 new_size * sizeof(vec3) } );
         sg_update_buffer(geometry->corner_radius_buf, &(sg_range){
-            ecs_vec_first_t(&geometry->corner_radius, float),
-                new_size * sizeof(float) } );
+            ecs_vec_first_t(&geometry->corner_radius, vec4),
+                new_size * sizeof(vec4) } );
         sg_update_buffer(geometry->stroke_color_buf, &(sg_range){
             ecs_vec_first_t(&geometry->stroke_color, vec3),
                 new_size * sizeof(vec3) } );
@@ -195,7 +195,7 @@ void gx_rounded_rect_collect(
 {
     ecs_vec_reset_t(NULL, &geometry->size, vec2);
     ecs_vec_reset_t(NULL, &geometry->color, vec3);
-    ecs_vec_reset_t(NULL, &geometry->corner_radius, float);
+    ecs_vec_reset_t(NULL, &geometry->corner_radius, vec4);
     ecs_vec_reset_t(NULL, &geometry->stroke_color, vec3);
     ecs_vec_reset_t(NULL, &geometry->stroke_width, float);
     ecs_vec_reset_t(NULL, &geometry->transform, mat4);
@@ -217,7 +217,7 @@ void gx_rounded_rect_collect(
 
         vec2 *i_size = ecs_vec_grow_t(NULL, &geometry->size, vec2, it.count);
         vec3 *i_color = ecs_vec_grow_t(NULL, &geometry->color, vec3, it.count);
-        float *i_corner_radius = ecs_vec_grow_t(NULL, &geometry->corner_radius, float, it.count);
+        vec4 *i_corner_radius = ecs_vec_grow_t(NULL, &geometry->corner_radius, vec4, it.count);
         vec3 *i_stroke_color = ecs_vec_grow_t(NULL, &geometry->stroke_color, vec3, it.count);
         float *i_stroke_width = ecs_vec_grow_t(NULL, &geometry->stroke_width, float, it.count);
         mat4 *i_transform = ecs_vec_grow_t(NULL, &geometry->transform, mat4, it.count);
@@ -225,7 +225,7 @@ void gx_rounded_rect_collect(
         for (int32_t i = 0; i < it.count; i ++) {
             ecs_os_memcpy_t(i_size[i], t[i].scale, vec2);
             ecs_os_memcpy_t(i_color[i], style[i].color, vec3);
-            i_corner_radius[i] = style[i].corner_radius;
+            ecs_os_memcpy_t(i_corner_radius[i], style[i].corner_radius, vec4);
             ecs_os_memcpy_t(i_stroke_color[i], style[i].stroke_color, vec3);
             i_stroke_width[i] = style[i].stroke_width;
             ecs_os_memcpy_t(i_transform[i], t[i].mat, mat4);

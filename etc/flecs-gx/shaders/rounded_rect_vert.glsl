@@ -1,7 +1,7 @@
 out vec4 pos;
 out vec2 size;
 out vec3 color;
-out float corner_radius;
+out vec4 corner_radius;
 out float stroke_width;
 out vec3 stroke_color;
 

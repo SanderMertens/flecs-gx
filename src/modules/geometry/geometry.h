@@ -8,6 +8,11 @@
 #define ECS_META_IMPL EXTERN
 #endif
 
+#define GxTopLeft     (0)
+#define GxTopRight    (1)
+#define GxBottomLeft  (2)
+#define GxBottomRight (3)
+
 typedef struct gx_mesh2_t {
     sg_buffer verts;
     sg_buffer idx;
@@ -105,7 +110,7 @@ ECS_STRUCT(GxStyleComputed, {
     vec3 color;
     vec3 stroke_color;
     float stroke_width;
-    float corner_radius;
+    vec4 corner_radius;
 });
 
 void gx_geometry_matvp_make(

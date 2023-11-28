@@ -473,7 +473,7 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
         for (int32_t i = 0; i < it->count; i ++) {
             cc[i].stroke_color[0] = st[i].color.r;
             cc[i].stroke_color[1] = st[i].color.g;
-            cc[i].stroke_color[2] = st[i].color.b;
+            cc[i].stroke_color[2] = st[i].color.b;            
             cc[i].stroke_width = st[i].width;
         }
     } else {
@@ -488,11 +488,23 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
     if (corner_radius) {
         for (int32_t i = 0; i < it->count; i ++) {
             float min = 0.5 * glm_min(g[i].width, g[i].height);
-            cc[i].corner_radius = glm_min(min, corner_radius[i].value);
+            float all = glm_min(min, corner_radius[i].value);
+            if (all) {
+                cc[i].corner_radius[GxTopLeft] = all;
+                cc[i].corner_radius[GxTopRight] = all;
+                cc[i].corner_radius[GxBottomLeft] = all;
+                cc[i].corner_radius[GxBottomRight] = all;
+            } else {
+                cc[i].corner_radius[GxTopLeft] = glm_min(min, corner_radius[i].top_left);
+                cc[i].corner_radius[GxTopRight] = glm_min(min, corner_radius[i].top_right);
+                cc[i].corner_radius[GxBottomLeft] = glm_min(min, corner_radius[i].bottom_left);
+                cc[i].corner_radius[GxBottomRight]= glm_min(min, corner_radius[i].bottom_right);
+
+            }
         }
     } else {
         for (int32_t i = 0; i < it->count; i ++) {
-            cc[i].corner_radius = 0;
+            ecs_os_zeromem(cc[i].corner_radius);
         }
     }
 
