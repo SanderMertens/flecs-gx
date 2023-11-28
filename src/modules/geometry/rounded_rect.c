@@ -128,10 +128,6 @@ void gx_rounded_rect_data_draw(
 
     sg_apply_bindings(&bind);
     sg_draw(0, geometry->mesh.index_count, geometry->instance_count);
-
-    // for (int32_t i = 0; i < geometry->instance_count; i ++) {
-        
-    // }
 }
 
 static
@@ -151,23 +147,25 @@ void gx_rounded_rect_update(
             sg_destroy_buffer(geometry->transform_buf);
         }
 
-        geometry->size_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(vec2), .usage = SG_USAGE_STREAM });
-        geometry->color_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
-        geometry->corner_radius_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(float), .usage = SG_USAGE_STREAM });
-        geometry->stroke_color_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
-        geometry->stroke_width_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(float), .usage = SG_USAGE_STREAM });
-        geometry->transform_buf = sg_make_buffer(&(sg_buffer_desc){
-            .size = new_size * sizeof(mat4), .usage = SG_USAGE_STREAM });
+        if (new_size) {
+            geometry->size_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(vec2), .usage = SG_USAGE_STREAM });
+            geometry->color_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
+            geometry->corner_radius_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(float), .usage = SG_USAGE_STREAM });
+            geometry->stroke_color_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(vec3), .usage = SG_USAGE_STREAM });
+            geometry->stroke_width_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(float), .usage = SG_USAGE_STREAM });
+            geometry->transform_buf = sg_make_buffer(&(sg_buffer_desc){
+                .size = new_size * sizeof(mat4), .usage = SG_USAGE_STREAM });
+        }
 
         geometry->instance_count = new_size;
     }
 
-    if (new_size > 0) {
+    if (new_size) {
         sg_update_buffer(geometry->size_buf, &(sg_range){
             ecs_vec_first_t(&geometry->size, vec2),
                 new_size * sizeof(vec2) } );

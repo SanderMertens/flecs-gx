@@ -487,7 +487,8 @@ void GxGeometryPopulateRect(ecs_iter_t *it) {
 
     if (corner_radius) {
         for (int32_t i = 0; i < it->count; i ++) {
-            cc[i].corner_radius = corner_radius[i].value;
+            float min = 0.5 * glm_min(g[i].width, g[i].height);
+            cc[i].corner_radius = glm_min(min, corner_radius[i].value);
         }
     } else {
         for (int32_t i = 0; i < it->count; i ++) {
